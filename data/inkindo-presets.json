@@ -1,0 +1,16 @@
+[
+  {
+    "id": "INK-2024-JAKARTA",
+    "label": "INKINDO 2024 – Jakarta (index 1.0)",
+    "year": 2024,
+    "province_index": 1.0,
+    "notes": "Reference preset only. Organization must populate baseline rates per grade/education/experience band from the official INKINDO billing-rate table; values are not embedded here for licensing reasons."
+  },
+  {
+    "id": "INK-2024-OUTSIDE-JAVA",
+    "label": "INKINDO 2024 – Outside Java (index 1.15)",
+    "year": 2024,
+    "province_index": 1.15,
+    "notes": "Reference preset only. Organization must populate baseline rates from the official INKINDO billing-rate table."
+  }
+]

@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deviota CalcEngine</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            deviota: {
+              50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6',
+              600: '#2563eb', 700: '#1d4ed8', 900: '#1e3a8a',
+            },
+          },
+        },
+      },
+    };
+  </script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <style>
+    [x-cloak] { display: none !important; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans" x-data="calcEngine()" x-cloak>
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+    <div class="flex items-center justify-between px-4 py-2 gap-3">
+      <div class="flex items-center gap-2">
+        <button class="lg:hidden p-2 -ml-2 text-slate-600" @click="sidebarOpen = !sidebarOpen" aria-label="Toggle menu">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+        </button>
+        <img src="assets/logo-deviota.svg" alt="Deviota" class="h-8" />
+        <span class="hidden sm:inline text-slate-400">|</span>
+        <span class="hidden sm:inline font-semibold text-slate-700">CalcEngine</span>
+      </div>
+
+      <div class="flex items-center gap-1 sm:gap-2 flex-wrap justify-end">
+        <span class="text-xs text-slate-400 mr-1" x-text="saveStatus"></span>
+        <button @click="newSimulation()" class="px-2 sm:px-3 py-1.5 text-sm rounded-md border border-slate-300 hover:bg-slate-50">New</button>
+        <button @click="triggerLoadJson()" class="px-2 sm:px-3 py-1.5 text-sm rounded-md border border-slate-300 hover:bg-slate-50">Load JSON</button>
+        <input type="file" accept="application/json" class="hidden" x-ref="loadJsonInput" @change="onLoadJsonFile($event)" />
+        <button @click="saveJson()" class="px-2 sm:px-3 py-1.5 text-sm rounded-md border border-slate-300 hover:bg-slate-50">Save JSON</button>
+        <button @click="exportPdf()" class="px-2 sm:px-3 py-1.5 text-sm rounded-md bg-deviota-600 text-white hover:bg-deviota-700">Export PDF</button>
+        <button @click="exportExcel()" class="px-2 sm:px-3 py-1.5 text-sm rounded-md bg-deviota-600 text-white hover:bg-deviota-700">Export Excel</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex">
+    <!-- Sidebar -->
+    <aside
+      class="fixed lg:sticky top-[49px] lg:top-[49px] left-0 h-[calc(100vh-49px)] w-72 bg-white border-r border-slate-200 overflow-y-auto z-20 transition-transform lg:translate-x-0"
+      :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+    >
+      <div class="p-4 space-y-6">
+
+        <section>
+          <h3 class="text-xs font-semibold uppercase text-slate-400 mb-2">Project Info</h3>
+          <div class="space-y-2">
+            <input type="text" x-model="state.project.name" placeholder="Project name" class="w-full text-sm border border-slate-300 rounded px-2 py-1.5" />
+            <input type="text" x-model="state.project.client" placeholder="Client" class="w-full text-sm border border-slate-300 rounded px-2 py-1.5" />
+            <input type="text" x-model="state.project.contact_person" placeholder="Contact person" class="w-full text-sm border border-slate-300 rounded px-2 py-1.5" />
+            <textarea x-model="state.project.notes" placeholder="Notes" rows="2" class="w-full text-sm border border-slate-300 rounded px-2 py-1.5"></textarea>
+          </div>
+        </section>
+
+        <section>
+          <h3 class="text-xs font-semibold uppercase text-slate-400 mb-2">Currency &amp; FX</h3>
+          <div class="space-y-2">
+            <select x-model="state.config.display_currency" class="w-full text-sm border border-slate-300 rounded px-2 py-1.5">
+              <option value="IDR">IDR</option>
+              <option value="USD">USD</option>
+            </select>
+            <div class="flex items-center gap-2 text-sm">
+              <label class="flex items-center gap-1"><input type="radio" value="manual" x-model="state.config.fx.mode" /> Manual</label>
+              <label class="flex items-center gap-1"><input type="radio" value="api" x-model="state.config.fx.mode" /> API</label>
+            </div>
+            <div class="flex items-center gap-2 text-sm">
+              <span class="text-slate-500 whitespace-nowrap">1 USD =</span>
+              <input type="number" x-model.number="state.config.fx.usd_to_idr" class="w-full text-sm border border-slate-300 rounded px-2 py-1.5" />
+              <span class="text-slate-500">IDR</span>
+            </div>
+            <template x-if="state.config.fx.mode === 'api'">
+              <div class="space-y-1">
+                <input type="text" x-model="state.config.fx.api_url" placeholder="FX API URL" class="w-full text-sm border border-slate-300 rounded px-2 py-1.5" />
+                <button @click="fetchFx()" class="w-full text-sm rounded-md border border-slate-300 px-2 py-1.5 hover:bg-slate-50">Fetch now</button>
+                <p class="text-xs text-slate-400" x-text="fxStatus"></p>
+              </div>
+            </template>
+          </div>
+        </section>
+
+        <section>
+          <h3 class="text-xs font-semibold uppercase text-slate-400 mb-2">Tax (PPN)</h3>
+          <div class="space-y-2 text-sm">
+            <label class="flex items-center gap-2"><input type="checkbox" x-model="state.config.tax.ppn_enabled" /> Enable PPN</label>
+            <div class="flex items-center gap-2">
+              <span class="text-slate-500 whitespace-nowrap">Rate</span>
+              <input type="number" step="0.01" min="0" max="1" x-model.number="state.config.tax.ppn_rate" class="w-full text-sm border border-slate-300 rounded px-2 py-1.5" />
+            </div>
+            <label class="flex items-center gap-2"><input type="checkbox" x-model="state.config.tax.use_advanced_dpp" /> Use advanced DPP (12% × 11/12 base)</label>
+          </div>
+        </section>
+
+        <section>
+          <h3 class="text-xs font-semibold uppercase text-slate-400 mb-2">HR Regulatory Presets</h3>
+          <div class="space-y-2 text-sm">
+            <select x-model="state.config.hr.inkindo_preset_id" class="w-full text-sm border border-slate-300 rounded px-2 py-1.5">
+              <option value="INK-2024-JAKARTA">INKINDO 2024 – Jakarta (1.0)</option>
+              <option value="INK-2024-OUTSIDE-JAVA">INKINDO 2024 – Outside Java (1.15)</option>
+            </select>
+            <div class="flex items-center gap-2">
+              <span class="text-slate-500 whitespace-nowrap">Region coeff.</span>
+              <input type="number" step="0.05" x-model.number="state.config.hr.region_coefficient" class="w-full text-sm border border-slate-300 rounded px-2 py-1.5" />
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-slate-500 whitespace-nowrap">Working days/mo</span>
+              <input type="number" x-model.number="state.config.hr.working_days_per_month" class="w-full text-sm border border-slate-300 rounded px-2 py-1.5" />
+            </div>
+            <label class="flex items-center gap-2"><input type="checkbox" x-model="state.config.hr.enforce_sbm_caps" /> Enforce SBM caps</label>
+            <label class="flex items-center gap-2"><input type="checkbox" x-model="state.config.hr.allow_manual_override" /> Allow manual rate override</label>
+          </div>
+        </section>
+
+      </div>
+    </aside>
+
+    <!-- Mobile sidebar overlay -->
+    <div x-show="sidebarOpen" @click="sidebarOpen = false" class="fixed inset-0 bg-black/30 z-10 lg:hidden" x-cloak></div>
+
+    <!-- Main content -->
+    <main class="flex-1 min-w-0 p-4 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
+
+      <div class="min-w-0">
+        <!-- Pillar tabs -->
+        <div class="flex gap-1 overflow-x-auto pb-2 mb-3 border-b border-slate-200">
+          <template x-for="p in pillars" :key="p">
+            <button
+              @click="activePillar = p"
+              class="px-3 py-1.5 text-sm rounded-t-md whitespace-nowrap"
+              :class="activePillar === p ? 'bg-white border border-b-white border-slate-200 text-deviota-700 font-medium' : 'text-slate-500 hover:text-slate-700'"
+              x-text="pillarLabels[p]"
+            ></button>
+          </template>
+        </div>
+
+        <!-- Pillar table -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-3 overflow-x-auto">
+          <div class="flex justify-between items-center mb-3">
+            <h2 class="font-semibold text-slate-700" x-text="pillarLabels[activePillar]"></h2>
+            <div class="flex gap-2">
+              <button @click="openCatalog(activePillar)" class="text-sm px-2 py-1 rounded border border-slate-300 hover:bg-slate-50">Add from catalog</button>
+              <button @click="addRow(activePillar)" class="text-sm px-2 py-1 rounded bg-deviota-600 text-white hover:bg-deviota-700">+ Add row</button>
+            </div>
+          </div>
+
+          <!-- Hardware -->
+          <template x-if="activePillar === 'hardware'">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-slate-400 border-b border-slate-200">
+                  <th class="py-1 pr-2">Name</th>
+                  <th class="py-1 pr-2">Qty</th>
+                  <th class="py-1 pr-2">Currency</th>
+                  <th class="py-1 pr-2">Unit Cost</th>
+                  <th class="py-1 pr-2">Margin %</th>
+                  <th class="py-1 pr-2">Maint %/yr</th>
+                  <th class="py-1 pr-2">PPN</th>
+                  <th class="py-1 pr-2 text-right">Subtotal</th>
+                  <th class="py-1"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="row in state.pillars.hardware.items" :key="row.id">
+                  <tr class="border-b border-slate-100">
+                    <td class="py-1 pr-2"><input type="text" x-model="row.name" class="w-40 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2"><input type="number" x-model.number="row.quantity" class="w-16 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2">
+                      <select x-model="row.currency" class="border border-slate-200 rounded px-1.5 py-1">
+                        <option value="IDR">IDR</option><option value="USD">USD</option>
+                      </select>
+                    </td>
+                    <td class="py-1 pr-2"><input type="number" x-model.number="row.unit_cost" class="w-28 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2"><input type="number" step="0.01" x-model.number="row.margin_pct" class="w-20 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2"><input type="number" step="0.01" x-model.number="row.annual_maintenance_pct_per_year" class="w-20 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2 text-center"><input type="checkbox" x-model="row.taxable_ppn" /></td>
+                    <td class="py-1 pr-2 text-right font-medium whitespace-nowrap" x-text="formatMoney(rowSubtotal(row.id))"></td>
+                    <td class="py-1 whitespace-nowrap">
+                      <button @click="duplicateRow('hardware', row.id)" class="text-slate-400 hover:text-slate-600 px-1" title="Duplicate">⧉</button>
+                      <button @click="deleteRow('hardware', row.id)" class="text-slate-400 hover:text-red-600 px-1" title="Delete">✕</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </template>
+
+          <!-- Software -->
+          <template x-if="activePillar === 'software'">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-slate-400 border-b border-slate-200">
+                  <th class="py-1 pr-2">Name</th>
+                  <th class="py-1 pr-2">Type</th>
+                  <th class="py-1 pr-2">Qty</th>
+                  <th class="py-1 pr-2">Period (mo)</th>
+                  <th class="py-1 pr-2">Seats</th>
+                  <th class="py-1 pr-2">Currency</th>
+                  <th class="py-1 pr-2">Unit Cost</th>
+                  <th class="py-1 pr-2">Margin %</th>
+                  <th class="py-1 pr-2">PPN</th>
+                  <th class="py-1 pr-2 text-right">Subtotal</th>
+                  <th class="py-1"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="row in state.pillars.software.items" :key="row.id">
+                  <tr class="border-b border-slate-100">
+                    <td class="py-1 pr-2"><input type="text" x-model="row.name" class="w-40 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2">
+                      <select x-model="row.type" class="border border-slate-200 rounded px-1.5 py-1">
+                        <option value="one_time">One-time setup</option>
+                        <option value="subscription">Subscription</option>
+                        <option value="maintenance">Maintenance/Support</option>
+                      </select>
+                    </td>
+                    <td class="py-1 pr-2"><input type="number" x-model.number="row.quantity" class="w-14 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2"><input type="number" x-model.number="row.period_months" class="w-16 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2"><input type="number" x-model.number="row.seats" class="w-14 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2">
+                      <select x-model="row.currency" class="border border-slate-200 rounded px-1.5 py-1">
+                        <option value="IDR">IDR</option><option value="USD">USD</option>
+                      </select>
+                    </td>
+                    <td class="py-1 pr-2"><input type="number" x-model.number="row.unit_cost" class="w-28 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2"><input type="number" step="0.01" x-model.number="row.margin_pct" class="w-20 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2 text-center"><input type="checkbox" x-model="row.taxable_ppn" /></td>
+                    <td class="py-1 pr-2 text-right font-medium whitespace-nowrap" x-text="formatMoney(rowSubtotal(row.id))"></td>
+                    <td class="py-1 whitespace-nowrap">
+                      <button @click="duplicateRow('software', row.id)" class="text-slate-400 hover:text-slate-600 px-1" title="Duplicate">⧉</button>
+                      <button @click="deleteRow('software', row.id)" class="text-slate-400 hover:text-red-600 px-1" title="Delete">✕</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </template>
+
+          <!-- Installation -->
+          <template x-if="activePillar === 'installation'">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-slate-400 border-b border-slate-200">
+                  <th class="py-1 pr-2">Name</th>
+                  <th class="py-1 pr-2">Location</th>
+                  <th class="py-1 pr-2">Category</th>
+                  <th class="py-1 pr-2">Qty</th>
+                  <th class="py-1 pr-2">Currency</th>
+                  <th class="py-1 pr-2">Unit Cost</th>
+                  <th class="py-1 pr-2">Margin %</th>
+                  <th class="py-1 pr-2">PPN</th>
+                  <th class="py-1 pr-2 text-right">Subtotal</th>
+                  <th class="py-1"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="row in state.pillars.installation.items" :key="row.id">
+                  <tr class="border-b border-slate-100">
+                    <td class="py-1 pr-2"><input type="text" x-model="row.name" class="w-40 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2"><input type="text" x-model="row.location" class="w-28 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2">
+                      <select x-model="row.category" class="border border-slate-200 rounded px-1.5 py-1">
+                        <option value="logistics">Logistics</option>
+                        <option value="materials">Materials</option>
+                        <option value="tooling">Tooling</option>
+                      </select>
+                    </td>
+                    <td class="py-1 pr-2"><input type="number" x-model.number="row.quantity" class="w-14 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2">
+                      <select x-model="row.currency" class="border border-slate-200 rounded px-1.5 py-1">
+                        <option value="IDR">IDR</option><option value="USD">USD</option>
+                      </select>
+                    </td>
+                    <td class="py-1 pr-2"><input type="number" x-model.number="row.unit_cost" class="w-28 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2"><input type="number" step="0.01" x-model.number="row.margin_pct" class="w-20 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2 text-center"><input type="checkbox" x-model="row.taxable_ppn" /></td>
+                    <td class="py-1 pr-2 text-right font-medium whitespace-nowrap" x-text="formatMoney(rowSubtotal(row.id))"></td>
+                    <td class="py-1 whitespace-nowrap">
+                      <button @click="duplicateRow('installation', row.id)" class="text-slate-400 hover:text-slate-600 px-1" title="Duplicate">⧉</button>
+                      <button @click="deleteRow('installation', row.id)" class="text-slate-400 hover:text-red-600 px-1" title="Delete">✕</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </template>
+
+          <!-- Human Resources -->
+          <template x-if="activePillar === 'human_resources'">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-slate-400 border-b border-slate-200">
+                  <th class="py-1 pr-2">Role</th>
+                  <th class="py-1 pr-2">Rate basis</th>
+                  <th class="py-1 pr-2">Source</th>
+                  <th class="py-1 pr-2">Region coeff.</th>
+                  <th class="py-1 pr-2">Duration</th>
+                  <th class="py-1 pr-2">Rate/month</th>
+                  <th class="py-1 pr-2">Override</th>
+                  <th class="py-1 pr-2">Custom rate</th>
+                  <th class="py-1 pr-2">PPN</th>
+                  <th class="py-1 pr-2 text-right">Subtotal</th>
+                  <th class="py-1"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="row in state.pillars.human_resources.items" :key="row.id">
+                  <tr class="border-b border-slate-100">
+                    <td class="py-1 pr-2"><input type="text" x-model="row.role" class="w-40 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2">
+                      <select x-model="row.rate_basis" class="border border-slate-200 rounded px-1.5 py-1">
+                        <option value="person_month">Person-Month</option>
+                        <option value="person_day">Person-Day</option>
+                        <option value="lump_sum">Lump Sum</option>
+                      </select>
+                    </td>
+                    <td class="py-1 pr-2">
+                      <select x-model="row.regulatory_source" class="border border-slate-200 rounded px-1.5 py-1">
+                        <option value="INKINDO">INKINDO</option>
+                        <option value="SBM">SBM</option>
+                        <option value="Custom">Custom</option>
+                      </select>
+                    </td>
+                    <td class="py-1 pr-2"><input type="number" step="0.05" x-model.number="row.region_coefficient" placeholder="global" class="w-20 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2">
+                      <input x-show="row.rate_basis === 'person_day'" type="number" x-model.number="row.duration_days" placeholder="days" class="w-16 border border-slate-200 rounded px-1.5 py-1" />
+                      <input x-show="row.rate_basis !== 'person_day'" type="number" x-model.number="row.duration_months" placeholder="months" class="w-16 border border-slate-200 rounded px-1.5 py-1" />
+                    </td>
+                    <td class="py-1 pr-2"><input type="number" x-model.number="row.rate_per_month" class="w-28 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2 text-center"><input type="checkbox" x-model="row.override_rate" /></td>
+                    <td class="py-1 pr-2"><input type="number" x-model.number="row.custom_rate" :disabled="!row.override_rate" class="w-24 border border-slate-200 rounded px-1.5 py-1 disabled:bg-slate-50" /></td>
+                    <td class="py-1 pr-2 text-center"><input type="checkbox" x-model="row.taxable_ppn" /></td>
+                    <td class="py-1 pr-2 text-right font-medium whitespace-nowrap" x-text="formatMoney(rowSubtotal(row.id))"></td>
+                    <td class="py-1 whitespace-nowrap">
+                      <button @click="duplicateRow('human_resources', row.id)" class="text-slate-400 hover:text-slate-600 px-1" title="Duplicate">⧉</button>
+                      <button @click="deleteRow('human_resources', row.id)" class="text-slate-400 hover:text-red-600 px-1" title="Delete">✕</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </template>
+
+          <p x-show="state.pillars[activePillar].items.length === 0" class="text-sm text-slate-400 py-6 text-center">No items yet. Add a row or pick one from the catalog.</p>
+        </div>
+      </div>
+
+      <!-- Summary panel -->
+      <div class="lg:sticky lg:top-[65px] self-start space-y-3">
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+          <h3 class="font-semibold text-slate-700 mb-3">Summary</h3>
+          <dl class="space-y-1.5 text-sm">
+            <div class="flex justify-between"><dt class="text-slate-500">Hardware</dt><dd x-text="formatMoney(totals?.pillar_totals.hardware)"></dd></div>
+            <div class="flex justify-between"><dt class="text-slate-500">Software</dt><dd x-text="formatMoney(totals?.pillar_totals.software)"></dd></div>
+            <div class="flex justify-between"><dt class="text-slate-500">Installation</dt><dd x-text="formatMoney(totals?.pillar_totals.installation)"></dd></div>
+            <div class="flex justify-between"><dt class="text-slate-500">Human Resources</dt><dd x-text="formatMoney(totals?.pillar_totals.human_resources)"></dd></div>
+            <div class="border-t border-slate-100 my-2"></div>
+            <div class="flex justify-between"><dt class="text-slate-500">Taxable base</dt><dd x-text="formatMoney(totals?.taxable_base)"></dd></div>
+            <div class="flex justify-between"><dt class="text-slate-500">PPN</dt><dd x-text="formatMoney(totals?.ppn_total)"></dd></div>
+            <div class="border-t border-slate-100 my-2"></div>
+            <div class="flex justify-between font-semibold text-base"><dt>Grand Total</dt><dd x-text="formatMoney(totals?.grand_total_after_tax)"></dd></div>
+          </dl>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+          <h3 class="font-semibold text-slate-700 mb-3">CAPEX / OPEX</h3>
+          <dl class="space-y-1.5 text-sm">
+            <div class="flex justify-between"><dt class="text-slate-500">CAPEX</dt><dd x-text="formatMoney(totals?.capex)"></dd></div>
+            <div class="flex justify-between"><dt class="text-slate-500">OPEX</dt><dd x-text="formatMoney(totals?.opex)"></dd></div>
+          </dl>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Catalog modal -->
+  <div x-show="catalogModalOpen" x-cloak class="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4" @click.self="catalogModalOpen = false">
+    <div class="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+      <div class="flex justify-between items-center p-4 border-b border-slate-200">
+        <h3 class="font-semibold" x-text="`Add from catalog — ${pillarLabels[activePillar]}`"></h3>
+        <button @click="catalogModalOpen = false" class="text-slate-400 hover:text-slate-600">✕</button>
+      </div>
+      <div class="p-2">
+        <template x-for="item in catalogItemsForActivePillar()" :key="item.id">
+          <button @click="addFromCatalog(item)" class="w-full text-left p-3 hover:bg-slate-50 rounded-md flex justify-between items-center gap-3">
+            <span>
+              <span class="block font-medium text-sm" x-text="item.name"></span>
+              <span class="block text-xs text-slate-400" x-text="item.description"></span>
+            </span>
+            <span class="text-sm whitespace-nowrap" x-text="`${item.currency} ${Number(item.unit_cost).toLocaleString()}`"></span>
+          </button>
+        </template>
+        <p x-show="catalogItemsForActivePillar().length === 0" class="text-sm text-slate-400 p-4 text-center">No catalog items for this pillar.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="src/js/config.js"></script>
+  <script src="src/js/calculations.js"></script>
+  <script src="src/js/state.js"></script>
+  <script src="src/js/import_export.js"></script>
+  <script src="src/js/export_pdf.js"></script>
+  <script src="src/js/export_excel.js"></script>
+  <script src="src/js/ui-bindings.js"></script>
+  <script src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
+</body>
+</html>

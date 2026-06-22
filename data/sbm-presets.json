@@ -1,0 +1,13 @@
+[
+  {
+    "id": "SBM-2026",
+    "label": "SBM TA 2026 (PMK 32/2025)",
+    "year": 2026,
+    "notes": "Reference preset only. Organization must populate category caps (travel, honorarium, daily allowance) from the official PMK on Standar Biaya Masukan; values are not embedded here for licensing reasons.",
+    "categories": [
+      { "code": "TRAVEL-DN-A", "label": "Domestic travel allowance, category A", "cap_idr": null },
+      { "code": "HOTEL-DN-A", "label": "Domestic hotel rate, category A", "cap_idr": null },
+      { "code": "HONOR-NARASUMBER", "label": "Honorarium – Narasumber", "cap_idr": null }
+    ]
+  }
+]

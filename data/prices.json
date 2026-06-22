@@ -1,0 +1,147 @@
+[
+  {
+    "id": "HW-PCB-CTRL-001",
+    "pillar": "hardware",
+    "name": "Controller PCB Assembly",
+    "description": "4-layer PCB with STM32 MCU, assembled at JLCPCB",
+    "source": "JLCPCB",
+    "category": "PCB Assembly",
+    "unit": "pcs",
+    "currency": "USD",
+    "unit_cost": 35.0,
+    "default_margin_pct": 0.25,
+    "default_maintenance_pct_per_year": 0.10,
+    "taxable_ppn": true,
+    "tags": ["cems", "iot", "controller"],
+    "metadata": {
+      "datasheet_url": "",
+      "vendor_sku": "",
+      "notes": ""
+    }
+  },
+  {
+    "id": "HW-SENSOR-GAS-001",
+    "pillar": "hardware",
+    "name": "Gas Analyzer Sensor Module",
+    "description": "NDIR CO2/SO2 sensor module, industrial grade",
+    "source": "Local Vendor",
+    "category": "Sensor",
+    "unit": "pcs",
+    "currency": "USD",
+    "unit_cost": 180.0,
+    "default_margin_pct": 0.20,
+    "default_maintenance_pct_per_year": 0.08,
+    "taxable_ppn": true,
+    "tags": ["cems", "sensor"],
+    "metadata": {
+      "datasheet_url": "",
+      "vendor_sku": "",
+      "notes": ""
+    }
+  },
+  {
+    "id": "HW-ENCLOSURE-001",
+    "pillar": "hardware",
+    "name": "IP65 Outdoor Enclosure",
+    "description": "Weatherproof enclosure for field controller",
+    "source": "Local Vendor",
+    "category": "Enclosure",
+    "unit": "pcs",
+    "currency": "IDR",
+    "unit_cost": 1500000,
+    "default_margin_pct": 0.20,
+    "default_maintenance_pct_per_year": 0.05,
+    "taxable_ppn": true,
+    "tags": ["enclosure"],
+    "metadata": {
+      "notes": ""
+    }
+  },
+  {
+    "id": "SW-LIC-PLATFORM-BASE",
+    "pillar": "software",
+    "name": "Platform Base License",
+    "description": "Deviota cloud platform base license, annual subscription",
+    "source": "Deviota",
+    "category": "Subscription",
+    "unit": "year",
+    "currency": "IDR",
+    "unit_cost": 120000000,
+    "default_margin_pct": 0.30,
+    "taxable_ppn": true,
+    "metadata": {
+      "license_type": "subscription",
+      "max_devices": 100
+    }
+  },
+  {
+    "id": "SW-SETUP-DASHBOARD",
+    "pillar": "software",
+    "name": "Dashboard Setup & Configuration",
+    "description": "One-time setup of monitoring dashboard for client",
+    "source": "Deviota",
+    "category": "One-time setup",
+    "unit": "lump_sum",
+    "currency": "IDR",
+    "unit_cost": 25000000,
+    "default_margin_pct": 0.30,
+    "taxable_ppn": true,
+    "metadata": {
+      "license_type": "one_time"
+    }
+  },
+  {
+    "id": "INST-FIELD-TEAM-001",
+    "pillar": "installation",
+    "name": "On-site Installation Team",
+    "description": "Travel, accommodation, and tools for field installation",
+    "source": "Deviota",
+    "category": "Logistics",
+    "unit": "lump_sum",
+    "currency": "IDR",
+    "unit_cost": 80000000,
+    "default_margin_pct": 0.15,
+    "taxable_ppn": true,
+    "metadata": {
+      "notes": ""
+    }
+  },
+  {
+    "id": "HR-INK-2024-AHLI-MADYA-10Y",
+    "pillar": "human_resources",
+    "name": "Ahli Madya 10-12 yrs",
+    "description": "INKINDO baseline remuneration, Jakarta index 1.0, S1",
+    "source": "INKINDO",
+    "category": "Person-Month",
+    "unit": "person-month",
+    "currency": "IDR",
+    "unit_cost": 39750000,
+    "taxable_ppn": false,
+    "metadata": {
+      "inkindo_reference": "INK-2024-TABLE-XX",
+      "education": "S1",
+      "experience_years_min": 10,
+      "experience_years_max": 12,
+      "province_index": 1.0
+    }
+  },
+  {
+    "id": "HR-INK-2024-AHLI-MUDA-3Y",
+    "pillar": "human_resources",
+    "name": "Ahli Muda 3-5 yrs",
+    "description": "INKINDO baseline remuneration, Jakarta index 1.0, S1",
+    "source": "INKINDO",
+    "category": "Person-Month",
+    "unit": "person-month",
+    "currency": "IDR",
+    "unit_cost": 22500000,
+    "taxable_ppn": false,
+    "metadata": {
+      "inkindo_reference": "INK-2024-TABLE-XX",
+      "education": "S1",
+      "experience_years_min": 3,
+      "experience_years_max": 5,
+      "province_index": 1.0
+    }
+  }
+]
