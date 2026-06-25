@@ -216,6 +216,12 @@ async function parsePdfBom(file) {
     const content = await page.getTextContent();
     fullText += `${content.items.map((it) => it.str).join(' ')}\n`;
   }
+  if (!fullText.trim()) {
+    throw new Error(
+      'No text layer found in this PDF (it appears to be rendered as vectors/images, ' +
+      'common for some JLCPCB invoice exports). Re-export as CSV/XLSX if available, or add line items manually.'
+    );
+  }
   return extractLineItemsFromText(fullText);
 }
 
