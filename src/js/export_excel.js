@@ -26,6 +26,7 @@ function pillarSheetRows(pillarKey, items, subtotals) {
     Currency: row.currency || '',
     'Unit Cost': row.unit_cost ?? row.rate_per_month ?? row.custom_rate ?? '',
     'Margin %': row.margin_pct != null ? row.margin_pct : '',
+    Transport: row.transport_cost ?? '',
     'Taxable PPN': row.taxable_ppn ? 'Yes' : 'No',
     Subtotal: subtotals[row.id] ?? 0,
   }));

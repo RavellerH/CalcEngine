@@ -87,6 +87,17 @@ Round-trip snapshot of a simulation: `version`, `meta`, `project`, `config` (dis
 
 See `data/prices.json` and the `import_export.js` module for the canonical shapes used by the app.
 
+### 3.3 PCB Pricing Sheet (Google Sheets)
+
+For hardware sourced via EasyEDA design / JLCPCB fabrication, pricing is maintained
+externally in a Google Sheet published-to-web as CSV, with columns:
+`id, name, source, category, currency, capital_cost, min_multiplier, transport_cost, sell_price, notes`,
+where `sell_price` is a live formula (`capital_cost * min_multiplier + transport_cost`).
+The app fetches this CSV read-only (no auth) into a secondary catalog, and writes
+back are a manual download/paste step (downloadable `.xlsx` with live formulas, or
+clipboard TSV using self-relative `ROW()` formulas) rather than an authenticated
+API write — keeping the app's no-backend architecture intact. See `pcb_pricing.js`.
+
 ## 4. Mathematical Formulation
 
 All numeric fields are floating point; currency values are rounded to 2 decimals for display.
@@ -103,12 +114,17 @@ All row totals are computed in display currency; native values are converted bef
 
 ### 4.2 Row Subtotals and Margins (Hardware / Software / Installation)
 
-For quantity `q`, base unit cost `p_base` (display currency), margin fraction `m`:
+For quantity `q`, base unit cost `p_base` (display currency), margin fraction `m`,
+and (hardware only) a flat per-unit transport cost `t`:
 
 ```
-sell_price = p_base * (1 + m)
+sell_price = p_base * (1 + m) + t
 row_subtotal = q * sell_price
 ```
+
+`t` defaults to 0 for software/installation rows. It exists primarily for the PCB
+quotation rule (section 3.3): `m = 1` (i.e. 2x) combined with `t` derived from an
+allocated shipment transport cost gives `sell_price = capital_cost * 2 + transport`.
 
 Annual hardware maintenance, with CAPEX subtotal `S_capex` and yearly maintenance fraction `α`:
 

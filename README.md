@@ -18,6 +18,36 @@ Then open `http://localhost:8080`.
 
 The included GitHub Actions workflow (`.github/workflows/github-pages.yml`) deploys the repository root to GitHub Pages on every push to `main`. Enable Pages in the repository settings with source set to "GitHub Actions".
 
+## PCB Quotation (JLCPCB/EasyEDA + Google Sheets pricing DB)
+
+The "PCB Quotation" button in the header opens a workflow for client quotations on
+hardware sourced via EasyEDA design / JLCPCB fabrication, following the rule
+**sell price = capital cost × multiplier (default 2x) + transport**:
+
+1. **Pricing database** — maintain your component pricing in a Google Sheet, then
+   `File > Share > Publish to web`, format **CSV**, and paste that link into the
+   modal's "Fetch pricing DB" field. No Sheet yet? Click "Download starter template"
+   for a ready-made `.xlsx` with the expected columns
+   (`id, name, source, category, currency, capital_cost, min_multiplier, transport_cost, sell_price, notes`)
+   and a live `sell_price` formula — import it into a new Google Sheet to bootstrap
+   the database, then share it with whoever maintains pricing.
+2. **Upload a BOM or JLCPCB quote** — CSV/Excel BOM exports (EasyEDA/JLCPCB) or a
+   JLCPCB quote/order PDF (best-effort text parsing; always review the parsed rows).
+   Unpriced BOM rows (e.g. EasyEDA BOMs have no cost) are matched against the fetched
+   pricing DB by name/part number.
+3. **Review & compute** — set a transport total for the batch (allocated across rows
+   proportional to capital cost) and the minimum multiplier, then either:
+   - **Add to Hardware pillar** to fold the quotation straight into the current
+     simulation (so the existing PDF/Excel client-quote export picks it up), or
+   - **Download Sheet-ready .xlsx** / **Copy formulas for Google Sheets** to push the
+     priced rows back into your pricing Sheet — the Sell Price column is written as a
+     live formula (`capital_cost * min_multiplier + transport_cost`), not a static
+     number, so it updates in the Sheet itself if a cost changes.
+
+This stays consistent with the app's no-backend architecture: the pricing Sheet is
+read via its public published-CSV link, and writes back are a manual
+download/paste step rather than an authenticated API call.
+
 ## Customizing regulatory presets
 
 - `data/prices.json` — seed catalog of hardware/software/installation/HR line items used by the "Add from catalog" modal.
@@ -34,6 +64,7 @@ src/js/state.js          appState shape + CRUD mutation helpers
 src/js/import_export.js  JSON save/load, localStorage auto-save, FX fetch
 src/js/export_pdf.js     pdfmake-based quote PDF export
 src/js/export_excel.js   SheetJS-based multi-sheet workbook export
+src/js/pcb_pricing.js    Google Sheets pricing DB fetch, BOM/quote parsing, quotation export
 src/js/ui-bindings.js    Alpine.js root component wiring state to the DOM
 data/                    Static catalogs and regulatory presets
 assets/                  Logo and favicon

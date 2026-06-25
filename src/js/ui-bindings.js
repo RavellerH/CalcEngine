@@ -13,6 +13,17 @@ function calcEngine() {
     fxStatus: '',
     saveStatus: '',
 
+    // --- PCB Quotation (Google Sheets pricing DB) ------------------------
+    pcbModalOpen: false,
+    pcbSheetUrl: '',
+    pcbCatalog: [],
+    pcbCatalogStatus: '',
+    pcbRows: [],
+    pcbUploadStatus: '',
+    pcbTransportTotal: 0,
+    pcbMultiplier: 2,
+    pcbExportStatus: '',
+
     async init() {
       try {
         const res = await fetch('data/prices.json');
@@ -163,6 +174,86 @@ function calcEngine() {
         this.recalc();
       } catch (err) {
         this.fxStatus = `Error: ${err.message}`;
+      }
+    },
+
+    // --- PCB Quotation (Google Sheets pricing DB) ------------------------
+
+    openPcbModal() {
+      this.pcbModalOpen = true;
+    },
+
+    async fetchPcbCatalog() {
+      this.pcbCatalogStatus = 'Fetching...';
+      try {
+        this.pcbCatalog = await fetchPcbPricingSheet(this.pcbSheetUrl);
+        this.pcbCatalogStatus = `Loaded ${this.pcbCatalog.length} pricing rows from the Sheet.`;
+      } catch (err) {
+        this.pcbCatalogStatus = `Error: ${err.message}`;
+      }
+    },
+
+    async onPcbFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      this.pcbUploadStatus = 'Parsing...';
+      try {
+        const rows = /\.pdf$/i.test(file.name) ? await parsePdfBom(file) : await parseBomFile(file);
+        this.pcbRows = matchBomToCatalog(rows, this.pcbCatalog);
+        this.pcbUploadStatus = `Parsed ${this.pcbRows.length} line items. Review and correct below before exporting.`;
+      } catch (err) {
+        this.pcbUploadStatus = `Error: ${err.message}`;
+      } finally {
+        event.target.value = '';
+      }
+    },
+
+    pcbQuotationRows() {
+      return computeQuotationRows(this.pcbRows, {
+        transportTotal: this.pcbTransportTotal,
+        multiplier: this.pcbMultiplier,
+      });
+    },
+
+    pcbBatchTotal() {
+      const rows = this.pcbQuotationRows();
+      const total = rows.reduce((acc, r) => acc + (r.row_total || 0), 0);
+      return this.formatMoney(total);
+    },
+
+    addPcbRowsToHardware() {
+      const rows = this.pcbQuotationRows();
+      rows.forEach((r) => {
+        addRow(this.state, 'hardware', {
+          name: r.name,
+          source: r.source || '',
+          quantity: r.quantity,
+          currency: r.currency || 'USD',
+          unit_cost: r.capital_cost,
+          margin_pct: (Number(r.min_multiplier) || 2) - 1,
+          transport_cost: r.transport_cost,
+        });
+      });
+      this.activePillar = 'hardware';
+      this.pcbModalOpen = false;
+      this.recalc();
+    },
+
+    downloadPcbQuotationWorkbook() {
+      try {
+        downloadQuotationWorkbook(this.pcbQuotationRows());
+        this.pcbExportStatus = 'Workbook downloaded.';
+      } catch (err) {
+        this.pcbExportStatus = `Error: ${err.message}`;
+      }
+    },
+
+    async copyPcbQuotationForSheets() {
+      try {
+        const count = await copyQuotationForSheets(this.pcbQuotationRows());
+        this.pcbExportStatus = `Copied ${count} rows — paste into your pricing Sheet (formulas stay live).`;
+      } catch (err) {
+        this.pcbExportStatus = `Error: ${err.message}`;
       }
     },
   };

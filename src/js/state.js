@@ -41,6 +41,7 @@ function rowDefaults(pillar) {
         currency: 'IDR',
         unit_cost: 0,
         margin_pct: 0.2,
+        transport_cost: 0,
         annual_maintenance_pct_per_year: 0.1,
         taxable_ppn: true,
         source: '',
@@ -121,6 +122,7 @@ function addRowFromCatalogItem(state, pillar, catalogItem) {
   };
   if (pillar === 'hardware') {
     overrides.margin_pct = catalogItem.default_margin_pct ?? base.margin_pct;
+    overrides.transport_cost = catalogItem.transport_cost ?? base.transport_cost;
     overrides.annual_maintenance_pct_per_year =
       catalogItem.default_maintenance_pct_per_year ?? base.annual_maintenance_pct_per_year;
     overrides.source = catalogItem.source || '';

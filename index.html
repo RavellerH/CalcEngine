@@ -25,6 +25,12 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  </script>
 
   <style>
     [x-cloak] { display: none !important; }
@@ -50,6 +56,7 @@
         <button @click="triggerLoadJson()" class="px-2 sm:px-3 py-1.5 text-sm rounded-md border border-slate-300 hover:bg-slate-50">Load JSON</button>
         <input type="file" accept="application/json" class="hidden" x-ref="loadJsonInput" @change="onLoadJsonFile($event)" />
         <button @click="saveJson()" class="px-2 sm:px-3 py-1.5 text-sm rounded-md border border-slate-300 hover:bg-slate-50">Save JSON</button>
+        <button @click="openPcbModal()" class="px-2 sm:px-3 py-1.5 text-sm rounded-md border border-slate-300 hover:bg-slate-50">PCB Quotation</button>
         <button @click="exportPdf()" class="px-2 sm:px-3 py-1.5 text-sm rounded-md bg-deviota-600 text-white hover:bg-deviota-700">Export PDF</button>
         <button @click="exportExcel()" class="px-2 sm:px-3 py-1.5 text-sm rounded-md bg-deviota-600 text-white hover:bg-deviota-700">Export Excel</button>
       </div>
@@ -174,6 +181,7 @@
                   <th class="py-1 pr-2">Currency</th>
                   <th class="py-1 pr-2">Unit Cost</th>
                   <th class="py-1 pr-2">Margin %</th>
+                  <th class="py-1 pr-2">Transport</th>
                   <th class="py-1 pr-2">Maint %/yr</th>
                   <th class="py-1 pr-2">PPN</th>
                   <th class="py-1 pr-2 text-right">Subtotal</th>
@@ -192,6 +200,7 @@
                     </td>
                     <td class="py-1 pr-2"><input type="number" x-model.number="row.unit_cost" class="w-28 border border-slate-200 rounded px-1.5 py-1" /></td>
                     <td class="py-1 pr-2"><input type="number" step="0.01" x-model.number="row.margin_pct" class="w-20 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2"><input type="number" step="0.01" x-model.number="row.transport_cost" class="w-20 border border-slate-200 rounded px-1.5 py-1" /></td>
                     <td class="py-1 pr-2"><input type="number" step="0.01" x-model.number="row.annual_maintenance_pct_per_year" class="w-20 border border-slate-200 rounded px-1.5 py-1" /></td>
                     <td class="py-1 pr-2 text-center"><input type="checkbox" x-model="row.taxable_ppn" /></td>
                     <td class="py-1 pr-2 text-right font-medium whitespace-nowrap" x-text="formatMoney(rowSubtotal(row.id))"></td>
@@ -416,12 +425,95 @@
     </div>
   </div>
 
+  <!-- PCB Quotation modal -->
+  <div x-show="pcbModalOpen" x-cloak class="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4" @click.self="pcbModalOpen = false">
+    <div class="bg-white rounded-lg shadow-lg max-w-3xl w-full max-h-[85vh] overflow-y-auto">
+      <div class="flex justify-between items-center p-4 border-b border-slate-200">
+        <h3 class="font-semibold">PCB Quotation — JLCPCB/EasyEDA pricing</h3>
+        <button @click="pcbModalOpen = false" class="text-slate-400 hover:text-slate-600">✕</button>
+      </div>
+
+      <div class="p-4 space-y-5">
+        <!-- Step 1: pricing database -->
+        <section>
+          <h4 class="text-xs font-semibold uppercase text-slate-400 mb-2">1. Pricing database (Google Sheet)</h4>
+          <p class="text-xs text-slate-400 mb-2">Paste the "Publish to web → CSV" link of your pricing Sheet. No Sheet yet? Download the starter template, fill it in, and create the Sheet from that file.</p>
+          <div class="flex flex-wrap gap-2">
+            <input type="text" x-model="pcbSheetUrl" placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv" class="flex-1 min-w-[260px] text-sm border border-slate-300 rounded px-2 py-1.5" />
+            <button @click="fetchPcbCatalog()" class="text-sm px-3 py-1.5 rounded border border-slate-300 hover:bg-slate-50">Fetch pricing DB</button>
+            <button @click="downloadPricingSheetTemplate()" class="text-sm px-3 py-1.5 rounded border border-slate-300 hover:bg-slate-50">Download starter template</button>
+          </div>
+          <p class="text-xs mt-1" :class="pcbCatalogStatus.startsWith('Error') ? 'text-red-600' : 'text-slate-400'" x-text="pcbCatalogStatus"></p>
+        </section>
+
+        <!-- Step 2: upload BOM/quote -->
+        <section>
+          <h4 class="text-xs font-semibold uppercase text-slate-400 mb-2">2. Upload BOM / JLCPCB quote</h4>
+          <div class="flex flex-wrap items-center gap-2">
+            <input type="file" accept=".csv,.xlsx,.xls,.pdf" x-ref="pcbFileInput" @change="onPcbFileUpload($event)" class="text-sm" />
+            <span class="text-xs text-slate-400">CSV/Excel BOM, or a JLCPCB quote/order PDF (best-effort parsing — review rows below).</span>
+          </div>
+          <p class="text-xs mt-1" :class="pcbUploadStatus.startsWith('Error') ? 'text-red-600' : 'text-slate-400'" x-text="pcbUploadStatus"></p>
+        </section>
+
+        <!-- Step 3: review & compute -->
+        <section x-show="pcbRows.length > 0">
+          <h4 class="text-xs font-semibold uppercase text-slate-400 mb-2">3. Review, set transport, and compute</h4>
+          <div class="flex flex-wrap gap-3 mb-2 text-sm">
+            <label class="flex items-center gap-1">Transport total <input type="number" x-model.number="pcbTransportTotal" class="w-24 border border-slate-200 rounded px-1.5 py-1" /></label>
+            <label class="flex items-center gap-1">Min. multiplier <input type="number" step="0.1" x-model.number="pcbMultiplier" class="w-16 border border-slate-200 rounded px-1.5 py-1" /></label>
+            <span class="text-xs text-slate-400 self-center">Transport is allocated across rows proportional to capital cost.</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-slate-400 border-b border-slate-200">
+                  <th class="py-1 pr-2">Name</th>
+                  <th class="py-1 pr-2">Qty</th>
+                  <th class="py-1 pr-2">Currency</th>
+                  <th class="py-1 pr-2">Capital cost</th>
+                  <th class="py-1 pr-2 text-right">Sell price</th>
+                  <th class="py-1 pr-2 text-right">Row total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="(row, idx) in pcbQuotationRows()" :key="idx">
+                  <tr class="border-b border-slate-100">
+                    <td class="py-1 pr-2"><input type="text" x-model="pcbRows[idx].name" class="w-36 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2"><input type="number" x-model.number="pcbRows[idx].quantity" class="w-14 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2">
+                      <select x-model="pcbRows[idx].currency" class="border border-slate-200 rounded px-1.5 py-1">
+                        <option value="IDR">IDR</option><option value="USD">USD</option>
+                      </select>
+                    </td>
+                    <td class="py-1 pr-2"><input type="number" x-model.number="pcbRows[idx].capital_cost" class="w-24 border border-slate-200 rounded px-1.5 py-1" /></td>
+                    <td class="py-1 pr-2 text-right" x-text="row.sell_price"></td>
+                    <td class="py-1 pr-2 text-right" x-text="row.row_total"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-sm font-medium mt-2">Batch total: <span x-text="pcbBatchTotal()"></span></p>
+
+          <div class="flex flex-wrap gap-2 mt-3">
+            <button @click="addPcbRowsToHardware()" class="text-sm px-3 py-1.5 rounded bg-deviota-600 text-white hover:bg-deviota-700">Add to Hardware pillar</button>
+            <button @click="downloadPcbQuotationWorkbook()" class="text-sm px-3 py-1.5 rounded border border-slate-300 hover:bg-slate-50">Download Sheet-ready .xlsx</button>
+            <button @click="copyPcbQuotationForSheets()" class="text-sm px-3 py-1.5 rounded border border-slate-300 hover:bg-slate-50">Copy formulas for Google Sheets</button>
+          </div>
+          <p class="text-xs mt-1 text-slate-400" x-text="pcbExportStatus"></p>
+        </section>
+      </div>
+    </div>
+  </div>
+
   <script src="src/js/config.js"></script>
   <script src="src/js/calculations.js"></script>
   <script src="src/js/state.js"></script>
   <script src="src/js/import_export.js"></script>
   <script src="src/js/export_pdf.js"></script>
   <script src="src/js/export_excel.js"></script>
+  <script src="src/js/pcb_pricing.js"></script>
   <script src="src/js/ui-bindings.js"></script>
   <script src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
 </body>

@@ -14,14 +14,17 @@ function convertCurrency(amount, from, to, usdToIdr) {
   return a;
 }
 
-/** Section 4.2/4.4 — generic row subtotal for hardware/software/installation rows. */
+/** Section 4.2/4.4 — generic row subtotal for hardware/software/installation rows.
+    Hardware rows may carry a per-unit `transport_cost`, added on top of the margin-based
+    sell price (e.g. the "2x capital + transport" PCB quotation rule — margin_pct=1 gives 2x). */
 function computeRowSubtotal(row, config) {
   const usdToIdr = config.fx.usd_to_idr;
   const display = config.display_currency;
   const qty = Number(row.quantity) || 0;
   const margin = Number(row.margin_pct) || 0;
   const baseInDisplay = convertCurrency(row.unit_cost, row.currency, display, usdToIdr);
-  const sellPrice = baseInDisplay * (1 + margin);
+  const transport = Number(row.transport_cost) || 0;
+  const sellPrice = baseInDisplay * (1 + margin) + transport;
   return round2(qty * sellPrice);
 }
 
