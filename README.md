@@ -24,13 +24,26 @@ The "PCB Quotation" button in the header opens a workflow for client quotations 
 hardware sourced via EasyEDA design / JLCPCB fabrication, following the rule
 **sell price = capital cost × multiplier (default 2x) + transport**:
 
-1. **Pricing database** — maintain your component pricing in a Google Sheet, then
-   `File > Share > Publish to web`, format **CSV**, and paste that link into the
-   modal's "Fetch pricing DB" field. No Sheet yet? Click "Download starter template"
-   for a ready-made `.xlsx` with the expected columns
+1. **Pricing database** — no Sheet yet? Click "Download starter template" for a
+   ready-made `.xlsx` with the expected columns
    (`id, name, source, category, currency, capital_cost, min_multiplier, transport_cost, sell_price, notes`)
    and a live `sell_price` formula — import it into a new Google Sheet to bootstrap
    the database, then share it with whoever maintains pricing.
+
+   Two ways to connect the app to that Sheet:
+   - **Apps Script Web App (recommended, read + write)** — deploy
+     [`tools/apps-script/Code.gs`](tools/apps-script/Code.gs) as a Web App bound to your
+     Sheet: open the Sheet, `Extensions > Apps Script`, paste in the file's contents,
+     set `SHARED_SECRET` to a value only you and whoever maintains pricing know, then
+     `Deploy > New deployment` → type **Web app**, Execute as **Me**, who has access
+     **Anyone with the link**. Paste the resulting URL and your secret into the modal's
+     "Apps Script Web App URL"/"Shared secret" fields and click "Connect". This is a
+     small server-side proxy bound to the Sheet — the app never holds a Google login,
+     but rows you push land in the Sheet as live formulas (`Range.setFormula()`),
+     auditable and editable by hand just like everything else in the Sheet.
+   - **Published-CSV link (fallback, read-only, no setup)** — `File > Share > Publish
+     to web`, format **CSV**, paste that link into "Fetch pricing DB". No deployment
+     needed, but pricing updates have to be pulled in manually and there's no write-back.
 2. **Upload a BOM or JLCPCB quote** — CSV/Excel BOM exports (EasyEDA/JLCPCB) or a
    JLCPCB quote/order PDF (best-effort text parsing; always review the parsed rows).
    Unpriced BOM rows (e.g. EasyEDA BOMs have no cost) are matched against the fetched
@@ -38,15 +51,20 @@ hardware sourced via EasyEDA design / JLCPCB fabrication, following the rule
 3. **Review & compute** — set a transport total for the batch (allocated across rows
    proportional to capital cost) and the minimum multiplier, then either:
    - **Add to Hardware pillar** to fold the quotation straight into the current
-     simulation (so the existing PDF/Excel client-quote export picks it up), or
-   - **Download Sheet-ready .xlsx** / **Copy formulas for Google Sheets** to push the
-     priced rows back into your pricing Sheet — the Sell Price column is written as a
-     live formula (`capital_cost * min_multiplier + transport_cost`), not a static
-     number, so it updates in the Sheet itself if a cost changes.
+     simulation (so the existing PDF/Excel client-quote export picks it up),
+   - **Push to Sheet via Apps Script** to append the priced rows directly to your
+     pricing Sheet (shown once an Apps Script URL is connected), or
+   - **Download Sheet-ready .xlsx** / **Copy formulas for Google Sheets** as a manual
+     download/paste fallback that needs no Apps Script deployment at all.
 
-This stays consistent with the app's no-backend architecture: the pricing Sheet is
-read via its public published-CSV link, and writes back are a manual
-download/paste step rather than an authenticated API call.
+   In every write path the Sell Price column ends up as a live formula
+   (`capital_cost * min_multiplier + transport_cost`), not a static number, so it stays
+   correct in the Sheet if a capital cost changes later.
+
+This keeps the app's no-backend architecture intact: it never holds Google credentials,
+and the Apps Script Web App (when used) is a small proxy *you* deploy and control inside
+your own Google account, gated by a shared secret you choose — not a hosted backend
+the app's authors operate.
 
 ## Customizing regulatory presets
 
@@ -64,8 +82,9 @@ src/js/state.js          appState shape + CRUD mutation helpers
 src/js/import_export.js  JSON save/load, localStorage auto-save, FX fetch
 src/js/export_pdf.js     pdfmake-based quote PDF export
 src/js/export_excel.js   SheetJS-based multi-sheet workbook export
-src/js/pcb_pricing.js    Google Sheets pricing DB fetch, BOM/quote parsing, quotation export
+src/js/pcb_pricing.js    Google Sheets pricing DB fetch/push, BOM/quote parsing, quotation export
 src/js/ui-bindings.js    Alpine.js root component wiring state to the DOM
+tools/apps-script/       Code.gs — Apps Script Web App bridge to deploy on your own Sheet
 data/                    Static catalogs and regulatory presets
 assets/                  Logo and favicon
 ```

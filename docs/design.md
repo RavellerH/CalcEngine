@@ -90,13 +90,33 @@ See `data/prices.json` and the `import_export.js` module for the canonical shape
 ### 3.3 PCB Pricing Sheet (Google Sheets)
 
 For hardware sourced via EasyEDA design / JLCPCB fabrication, pricing is maintained
-externally in a Google Sheet published-to-web as CSV, with columns:
+externally in a Google Sheet, with columns:
 `id, name, source, category, currency, capital_cost, min_multiplier, transport_cost, sell_price, notes`,
 where `sell_price` is a live formula (`capital_cost * min_multiplier + transport_cost`).
-The app fetches this CSV read-only (no auth) into a secondary catalog, and writes
-back are a manual download/paste step (downloadable `.xlsx` with live formulas, or
-clipboard TSV using self-relative `ROW()` formulas) rather than an authenticated
-API write — keeping the app's no-backend architecture intact. See `pcb_pricing.js`.
+
+Two integration paths, both implemented in `pcb_pricing.js`:
+
+- **Apps Script Web App proxy (primary)** — `tools/apps-script/Code.gs` is a
+  `doGet`/`doPost` Apps Script deployed by the user as a Web App bound to their own
+  Sheet (Execute as Me, Anyone with the link). `doGet` returns all pricing rows as
+  JSON; `doPost` appends quotation rows and writes `sell_price` via
+  `Range.setFormula()` so it stays a live, auditable formula rather than a static
+  number. Writes are gated by a shared-secret string compared in `doPost` (`body.secret
+  === SHARED_SECRET`) — the only credential involved, chosen and held entirely by the
+  user, never by the app. `fetchPcbPricingViaAppsScript()`/`pushQuotationToAppsScript()`
+  call the deployed URL via `fetch()`. POST requests use `Content-Type:
+  text/plain;charset=utf-8` rather than `application/json`, because Apps Script Web Apps
+  don't support CORS preflight (`OPTIONS`) — a JSON content-type would trigger one and
+  fail; `text/plain` qualifies as a CORS "simple request" instead.
+- **Published-CSV link (fallback, read-only)** — the Sheet is published-to-web as CSV
+  and fetched read-only with no auth (`fetchPcbPricingSheet()`); writes back are a
+  manual download/paste step (downloadable `.xlsx` with live formulas, or clipboard TSV
+  using self-relative `ROW()` formulas) requiring no deployment at all.
+
+Both paths keep the app's no-backend architecture intact: the app itself never holds
+Google credentials. The Apps Script Web App, when used, is a small proxy the user
+deploys and controls inside their own Google account — not a backend operated by the
+app's authors.
 
 ## 4. Mathematical Formulation
 

@@ -104,6 +104,41 @@ async function fetchPcbPricingSheet(csvUrl) {
   return rowsToObjects(parseCsv(text)).map(pricingRowToCatalogItem).filter(Boolean);
 }
 
+/** Fetches pricing rows via the Apps Script Web App bridge (tools/apps-script/Code.gs),
+    which proxies reads/writes to the bound Sheet without requiring the end user to
+    sign into Google. Preferred over fetchPcbPricingSheet() once the Web App is deployed,
+    since it also unlocks pushQuotationToAppsScript() for true automated writes. */
+async function fetchPcbPricingViaAppsScript(webAppUrl) {
+  if (!webAppUrl) throw new Error('No Apps Script Web App URL configured.');
+  const res = await fetch(webAppUrl, { method: 'GET' });
+  if (!res.ok) throw new Error(`Apps Script request failed with status ${res.status}`);
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Apps Script returned an error.');
+  return data.rows.map(pricingRowToCatalogItem).filter(Boolean);
+}
+
+/** Appends quotation rows to the Sheet via the Apps Script Web App bridge, with the
+    Sheet itself computing sell_price as a live formula (see Code.gs doPost). The
+    Content-Type below must stay text/plain: Apps Script Web Apps don't support CORS
+    preflight, and a JSON content-type would trigger one and fail. */
+async function pushQuotationToAppsScript(webAppUrl, sharedSecret, quotationRows) {
+  if (!webAppUrl) throw new Error('No Apps Script Web App URL configured.');
+  const rows = quotationRows.map((r) => ({
+    id: r.id || '', name: r.name, source: r.source || '', category: r.category || '',
+    currency: r.currency || 'USD', capital_cost: r.capital_cost, min_multiplier: r.min_multiplier,
+    transport_cost: r.transport_cost, notes: r.notes || '',
+  }));
+  const res = await fetch(webAppUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ secret: sharedSecret, rows }),
+  });
+  if (!res.ok) throw new Error(`Apps Script request failed with status ${res.status}`);
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Apps Script returned an error.');
+  return data.appended;
+}
+
 function bomRowToLineItem(o) {
   const name = o.name || o.part || o.comment || o.description || o.designator;
   if (!name) return null;

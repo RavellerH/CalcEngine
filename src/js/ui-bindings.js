@@ -23,6 +23,9 @@ function calcEngine() {
     pcbTransportTotal: 0,
     pcbMultiplier: 2,
     pcbExportStatus: '',
+    pcbAppsScriptUrl: '',
+    pcbSharedSecret: '',
+    pcbAppsScriptStatus: '',
 
     async init() {
       try {
@@ -190,6 +193,26 @@ function calcEngine() {
         this.pcbCatalogStatus = `Loaded ${this.pcbCatalog.length} pricing rows from the Sheet.`;
       } catch (err) {
         this.pcbCatalogStatus = `Error: ${err.message}`;
+      }
+    },
+
+    async fetchPcbCatalogViaAppsScript() {
+      this.pcbAppsScriptStatus = 'Fetching...';
+      try {
+        this.pcbCatalog = await fetchPcbPricingViaAppsScript(this.pcbAppsScriptUrl);
+        this.pcbAppsScriptStatus = `Loaded ${this.pcbCatalog.length} pricing rows via Apps Script.`;
+      } catch (err) {
+        this.pcbAppsScriptStatus = `Error: ${err.message}`;
+      }
+    },
+
+    async pushPcbQuotationToSheet() {
+      this.pcbAppsScriptStatus = 'Pushing to Sheet...';
+      try {
+        const appended = await pushQuotationToAppsScript(this.pcbAppsScriptUrl, this.pcbSharedSecret, this.pcbQuotationRows());
+        this.pcbAppsScriptStatus = `Pushed ${appended} rows to the Sheet — sell price is a live formula.`;
+      } catch (err) {
+        this.pcbAppsScriptStatus = `Error: ${err.message}`;
       }
     },
 

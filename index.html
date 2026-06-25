@@ -437,13 +437,34 @@
         <!-- Step 1: pricing database -->
         <section>
           <h4 class="text-xs font-semibold uppercase text-slate-400 mb-2">1. Pricing database (Google Sheet)</h4>
-          <p class="text-xs text-slate-400 mb-2">Paste the "Publish to web → CSV" link of your pricing Sheet. No Sheet yet? Download the starter template, fill it in, and create the Sheet from that file.</p>
-          <div class="flex flex-wrap gap-2">
-            <input type="text" x-model="pcbSheetUrl" placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv" class="flex-1 min-w-[260px] text-sm border border-slate-300 rounded px-2 py-1.5" />
-            <button @click="fetchPcbCatalog()" class="text-sm px-3 py-1.5 rounded border border-slate-300 hover:bg-slate-50">Fetch pricing DB</button>
-            <button @click="downloadPricingSheetTemplate()" class="text-sm px-3 py-1.5 rounded border border-slate-300 hover:bg-slate-50">Download starter template</button>
+          <p class="text-xs text-slate-400 mb-2">No Sheet yet? Download the starter template, fill it in, and create the Sheet from that file.</p>
+          <button @click="downloadPricingSheetTemplate()" class="text-sm px-3 py-1.5 rounded border border-slate-300 hover:bg-slate-50 mb-3">Download starter template</button>
+
+          <div class="border border-slate-200 rounded p-3 mb-3">
+            <p class="text-xs font-medium mb-1">Apps Script Web App (read + write, recommended)</p>
+            <p class="text-xs text-slate-400 mb-2">
+              Deploy <a href="tools/apps-script/Code.gs" download class="text-deviota-600 underline">tools/apps-script/Code.gs</a>
+              as a Web App bound to your Sheet (Extensions &gt; Apps Script &gt; paste the file &gt; Deploy &gt; New deployment &gt;
+              Web app, Execute as Me, Anyone with the link). Paste the resulting URL and your chosen shared secret below —
+              this enables true bidirectional sync without anyone signing into Google.
+            </p>
+            <div class="flex flex-wrap gap-2">
+              <input type="text" x-model="pcbAppsScriptUrl" placeholder="https://script.google.com/macros/s/.../exec" class="flex-1 min-w-[220px] text-sm border border-slate-300 rounded px-2 py-1.5" />
+              <input type="password" x-model="pcbSharedSecret" placeholder="Shared secret" class="w-32 text-sm border border-slate-300 rounded px-2 py-1.5" />
+              <button @click="fetchPcbCatalogViaAppsScript()" class="text-sm px-3 py-1.5 rounded border border-slate-300 hover:bg-slate-50">Connect (read + write)</button>
+            </div>
+            <p class="text-xs mt-1" :class="pcbAppsScriptStatus.startsWith('Error') ? 'text-red-600' : 'text-slate-400'" x-text="pcbAppsScriptStatus"></p>
           </div>
-          <p class="text-xs mt-1" :class="pcbCatalogStatus.startsWith('Error') ? 'text-red-600' : 'text-slate-400'" x-text="pcbCatalogStatus"></p>
+
+          <div class="border border-slate-200 rounded p-3">
+            <p class="text-xs font-medium mb-1">Published-CSV link (read-only fallback, no setup)</p>
+            <p class="text-xs text-slate-400 mb-2">Paste the "Publish to web → CSV" link of your pricing Sheet.</p>
+            <div class="flex flex-wrap gap-2">
+              <input type="text" x-model="pcbSheetUrl" placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv" class="flex-1 min-w-[260px] text-sm border border-slate-300 rounded px-2 py-1.5" />
+              <button @click="fetchPcbCatalog()" class="text-sm px-3 py-1.5 rounded border border-slate-300 hover:bg-slate-50">Fetch pricing DB</button>
+            </div>
+            <p class="text-xs mt-1" :class="pcbCatalogStatus.startsWith('Error') ? 'text-red-600' : 'text-slate-400'" x-text="pcbCatalogStatus"></p>
+          </div>
         </section>
 
         <!-- Step 2: upload BOM/quote -->
@@ -498,10 +519,12 @@
 
           <div class="flex flex-wrap gap-2 mt-3">
             <button @click="addPcbRowsToHardware()" class="text-sm px-3 py-1.5 rounded bg-deviota-600 text-white hover:bg-deviota-700">Add to Hardware pillar</button>
+            <button @click="pushPcbQuotationToSheet()" class="text-sm px-3 py-1.5 rounded bg-deviota-600 text-white hover:bg-deviota-700" x-show="pcbAppsScriptUrl">Push to Sheet via Apps Script</button>
             <button @click="downloadPcbQuotationWorkbook()" class="text-sm px-3 py-1.5 rounded border border-slate-300 hover:bg-slate-50">Download Sheet-ready .xlsx</button>
             <button @click="copyPcbQuotationForSheets()" class="text-sm px-3 py-1.5 rounded border border-slate-300 hover:bg-slate-50">Copy formulas for Google Sheets</button>
           </div>
           <p class="text-xs mt-1 text-slate-400" x-text="pcbExportStatus"></p>
+          <p class="text-xs mt-1" :class="pcbAppsScriptStatus.startsWith('Error') ? 'text-red-600' : 'text-slate-400'" x-text="pcbAppsScriptStatus"></p>
         </section>
       </div>
     </div>
